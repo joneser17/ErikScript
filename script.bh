@@ -1,0 +1,54 @@
+#This script starts up apache server and hosts static html pages.
+#Erik Jones
+
+#Installs apache/dependencies
+sudo apt-get -y update
+sudo apt -y install curl
+sudo apt -y install  apache2
+YELLOW="\e[33m"
+GREEN="\e[32m"
+NOCOLOR="\e[0m"
+
+#Checks to see if directory is already created, for idempotence.
+if [ -d "/var/www/example/" ] 
+then
+	sudo rm -r /var/www/example/ && echo -e "${YELLOW}Directory /example exists, removing and replacing..." 
+fi
+
+sudo mkdir /var/www/example/
+
+#Copies static html pages from examples in DHTS folder for apache.
+echo -e "${YELLOW}Copying over static html pages..."
+sudo cp -r example /var/www/example/
+
+#Copies over server config file to apache config folder.
+echo -e "${YELLOW}Copying over config file..."
+sudo cp dhts-Example.conf /etc/apache2/sites-available
+
+# Adds the url to hosts if not already present. Here because I have no domains so it's for testing. In production this wouldn't be here.
+last=$( tail -n 1 /etc/hosts )
+if [ "$last" != "127.0.0.1	www.DHTS-example.com" ]
+then
+	echo '127.0.0.1	www.DHTS-example.com' | sudo tee -a /etc/hosts > /dev/null	
+fi
+
+# Initialize server config and starts apache server.
+sudo a2ensite dhts-Example.conf
+sudo systemctl restart apache2
+
+#Test all html pages within example folder.
+cd example
+for f in *;
+do
+	#Tests to see if webpage is successfully hosted (Code 200)
+	code=$(curl -s -o /dev/null -w "%{http_code}" www.DHTS-example.com/$f)
+	if [ $code -eq 200 ]
+	then
+		echo -e "${YELLOW}Processed $f...${GREEN}"
+	else
+		echo -e "${YELLOW}Processed (non 200) $f...${YELLOW}"
+	fi
+	 curl -I www.DHTS-example.com/$f && echo -e "${NOCOLOR}"
+done
+
+echo "Hosted on http://www.dhts-example.com/"
